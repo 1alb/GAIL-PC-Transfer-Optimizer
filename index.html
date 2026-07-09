@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Asset Optimizer — Upload Console</title>
+<style>
+  /* ============================================================
+     DESIGN TOKENS
+     ============================================================ */
+  :root{
+    --bg-1:#0b1120;
+    --bg-2:#101a30;
+    --glass:rgba(255,255,255,0.06);
+    --glass-border:rgba(255,255,255,0.12);
+    --glass-strong:rgba(255,255,255,0.10);
+    --accent:#5b8cff;
+    --accent-2:#8b5cf6;
+    --accent-soft:rgba(91,140,255,0.15);
+    --success:#34d399;
+    --success-soft:rgba(52,211,153,0.12);
+    --error:#f87171;
+    --error-soft:rgba(248,113,113,0.12);
+    --text-1:#eef2ff;
+    --text-2:#9aa4bf;
+    --text-3:#6b7590;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:9px;
+    --shadow-soft:0 10px 40px rgba(0,0,0,0.35);
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    color:var(--text-1);
+    background:
+      radial-gradient(circle at 15% 10%, rgba(91,140,255,0.16), transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(139,92,246,0.14), transparent 45%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    background-attachment:fixed;
+  }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .page{
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:48px 20px 80px;
+  }
+
+  .card{
+    width:100%;
+    max-width:760px;
+    background:var(--glass);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--glass-border);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-soft);
+    padding:40px 36px 36px;
+    animation:cardIn .5s ease;
+  }
+
+  @keyframes cardIn{
+    from{ opacity:0; transform:translateY(14px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .header{
+    text-align:center;
+    margin-bottom:32px;
+  }
+
+  .header .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    background:var(--accent-soft);
+    padding:6px 14px;
+    border-radius:999px;
+    margin-bottom:14px;
+  }
+
+  .header .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-soft);
+  }
+
+  .header h1{
+    margin:0 0 8px;
+    font-size:26px;
+    font-weight:700;
+    letter-spacing:-.01em;
+  }
+
+  .header p{
+    margin:0;
+    color:var(--text-2);
+    font-size:14.5px;
+    line-height:1.5;
+  }
+
+  /* ============================================================
+     UPLOAD ZONES
+     ============================================================ */
+  .zones{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    margin-bottom:26px;
+  }
+
+  .zone{
+    border:1.5px dashed var(--glass-border);
+    border-radius:var(--radius-md);
+    background:rgba(255,255,255,0.03);
+    padding:20px;
+    transition:border-color .2s ease, background .2s ease, transform .15s ease;
+    position:relative;
+  }
+
+  .zone:hover{
+    border-color:rgba(255,255,255,0.25);
+  }
+
+  .zone.dragover{
+    border-color:var(--accent);
+    background:var(--accent-soft);
+    transform:scale(1.01);
+  }
+
+  .zone.has-error{
+    border-color:var(--error);
+    animation:shake .35s ease;
+  }
+
+  @keyframes shake{
+    0%,100%{ transform:translateX(0); }
+    25%{ transform:translateX(-4px); }
+    75%{ transform:translateX(4px); }
+  }
+
+  .zone-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin-bottom:10px;
+  }
+
+  .zone-label{
+    font-size:14.5px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .zone-label .req{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--accent);
+    background:var(--accent-soft);
+    padding:2px 8px;
+    border-radius:999px;
+  }
+
+  .zone-label .opt{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--text-3);
+    background:rgba(255,255,255,0.06);
+    padding:2px 8px;
+    border-radius:999px;
+  }
+
+  .zone-count{
+    font-size:12.5px;
+    color:var(--text-2);
+    white-space:nowrap;
+  }
+
+  .drop-inner{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:18px 10px;
+    border-radius:var(--radius-sm);
+    cursor:pointer;
+    transition:background .2s ease;
+  }
+
+  .drop-inner:hover{
+    background:rgba(255,255,255,0.03);
+  }
+
+  .drop-inner svg{
+    width:28px; height:28px;
+    stroke:var(--text-2);
+    margin-bottom:8px;
+  }
+
+  .drop-inner .main-txt{
+    font-size:13.5px;
+    color:var(--text-1);
+    font-weight:500;
+  }
+
+  .drop-inner .sub-txt{
+    font-size:12px;
+    color:var(--text-3);
+    margin-top:2px;
+  }
+
+  .drop-inner .accent-word{
+    color:var(--accent);
+  }
+
+  input[type="file"]{
+    display:none;
+  }
+
+  /* file list */
+  .file-list{
+    margin-top:12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .file-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:var(--radius-sm);
+    padding:9px 12px;
+    font-size:13px;
+    animation:fileIn .25s ease;
+  }
+
+  @keyframes fileIn{
+    from{ opacity:0; transform:translateY(-4px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .file-item .file-meta{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    min-width:0;
+  }
+
+  .file-item .file-icon{
+    flex:0 0 auto;
+    width:26px; height:26px;
+    border-radius:7px;
+    background:var(--accent-soft);
+    color:var(--accent);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    font-weight:700;
+  }
+
+  .file-item .file-name{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:340px;
+    color:var(--text-1);
+  }
+
+  .file-item .file-size{
+    color:var(--text-3);
+    font-size:11.5px;
+    flex:0 0 auto;
+  }
+
+  .file-item .remove-btn{
+    flex:0 0 auto;
+    background:none;
+    border:none;
+    color:var(--text-3);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px 6px;
+    border-radius:6px;
+    transition:color .15s ease, background .15s ease;
+  }
+
+  .file-item .remove-btn:hover{
+    color:var(--error);
+    background:var(--error-soft);
+  }
+
+  .zone-error-msg{
+    margin-top:8px;
+    font-size:12px;
+    color:var(--error);
+  }
+
+  /* ============================================================
+     SUBMIT BUTTON
+     ============================================================ */
+  .submit-btn{
+    width:100%;
+    padding:16px 20px;
+    border:none;
+    border-radius:var(--radius-md);
+    background:linear-gradient(135deg, var(--accent), var(--accent-2));
+    color:#fff;
+    font-size:15.5px;
+    font-weight:700;
+    letter-spacing:.01em;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    box-shadow:0 8px 24px rgba(91,140,255,0.35);
+    transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+  }
+
+  .submit-btn:hover:not(:disabled){
+    transform:translateY(-2px);
+    box-shadow:0 12px 30px rgba(91,140,255,0.45);
+  }
+
+  .submit-btn:active:not(:disabled){
+    transform:translateY(0);
+  }
+
+  .submit-btn:disabled{
+    opacity:.6;
+    cursor:not-allowed;
+    box-shadow:none;
+  }
+
+  .spinner{
+    width:18px; height:18px;
+    border-radius:50%;
+    border:2.5px solid rgba(255,255,255,0.4);
+    border-top-color:#fff;
+    animation:spin .7s linear infinite;
+    display:none;
+  }
+
+  .submit-btn.loading .spinner{ display:inline-block; }
+  .submit-btn.loading .btn-txt{ display:none; }
+
+  @keyframes spin{
+    to{ transform:rotate(360deg); }
+  }
+
+  /* progress bar */
+  .progress-wrap{
+    margin-top:14px;
+    height:6px;
+    width:100%;
+    background:rgba(255,255,255,0.08);
+    border-radius:999px;
+    overflow:hidden;
+    display:none;
+  }
+
+  .progress-wrap.active{ display:block; }
+
+  .progress-bar{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius:999px;
+    transition:width .2s ease;
+  }
+
+  .progress-label{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--text-2);
+    text-align:center;
+    display:none;
+  }
+
+  .progress-label.active{ display:block; }
+
+  /* ============================================================
+     NOTIFICATIONS / RESPONSE
+     ============================================================ */
+  .notice{
+    margin-top:20px;
+    padding:16px 18px;
+    border-radius:var(--radius-md);
+    font-size:13.5px;
+    line-height:1.5;
+    display:none;
+    animation:fileIn .3s ease;
+  }
+
+  .notice.show{ display:block; }
+
+  .notice.success{
+    background:var(--success-soft);
+    border:1px solid rgba(52,211,153,0.35);
+    color:#a7f3d5;
+  }
+
+  .notice.error{
+    background:var(--error-soft);
+    border:1px solid rgba(248,113,113,0.35);
+    color:#fecaca;
+  }
+
+  .notice .notice-title{
+    font-weight:700;
+    margin-bottom:4px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .notice pre{
+    margin:10px 0 0;
+    background:rgba(0,0,0,0.25);
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:12px;
+    line-height:1.5;
+    overflow-x:auto;
+    color:var(--text-1);
+    max-height:280px;
+    overflow-y:auto;
+  }
+
+  .notice .download-link{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+    padding:10px 16px;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.14);
+    border-radius:var(--radius-sm);
+    color:var(--text-1);
+    text-decoration:none;
+    font-size:13px;
+    font-weight:600;
+    transition:background .15s ease, border-color .15s ease;
+  }
+
+  .notice .download-link:hover{
+    background:rgba(255,255,255,0.14);
+    border-color:rgba(255,255,255,0.24);
+  }
+
+  /* footer note */
+  .footnote{
+    margin-top:24px;
+    text-align:center;
+    font-size:11.5px;
+    color:var(--text-3);
+  }
+
+  .footnote code{
+    background:rgba(255,255,255,0.06);
+    padding:2px 6px;
+    border-radius:5px;
+    color:var(--text-2);
+  }
+
+  /* responsive */
+  @media (max-width:560px){
+    .card{ padding:28px 20px 24px; }
+    .header h1{ font-size:22px; }
+    .file-item .file-name{ max-width:170px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="card">
+
+    <div class="header">
+      <span class="eyebrow"><span class="dot"></span>n8n Workflow Test Console</span>
+      <h1>Asset Optimizer Upload</h1>
+      <p>Upload asset inventory and transfer records to run the optimization workflow.</p>
+    </div>
+
+    <form id="uploadForm">
+      <div class="zones">
+
+        <!-- ASSET INVENTORY PDFS (optional, multiple) -->
+        <div class="zone" id="zone-assetPdfs" data-input="assetPdfs">
+          <div class="zone-top">
+            <span class="zone-label">Asset Inventory PDFs <span class="opt">Optional</span></span>
+            <span class="zone-count" id="count-assetPdfs">0 files</span>
+          </div>
+          <label class="drop-inner" for="input-assetPdfs">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4L7 9M12 4l5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+            <span class="main-txt">Drop PDFs here or <span class="accent-word">browse</span></span>
+            <span class="sub-txt">Multiple .pdf files accepted</span>
+          </label>
+          <input type="file" id="input-assetPdfs" name="assetPdfs" accept=".pdf" multiple />
+          <div class="file-list" id="filelist-assetPdfs"></div>
+          <div class="zone-error-msg" id="error-assetPdfs"></div>
+        </div>
+
+        <!-- EMPLOYEE TRANSFER PDFS (required, multiple) -->
+        <div class="zone" id="zone-transferPdf" data-input="transferPdf">
+          <div class="zone-top">
+            <span class="zone-label">Employee Transfer PDF(s) <span class="req">Required</span></span>
+            <span class="zone-count" id="count-transferPdf">0 files</span>
+          </div>
+          <label class="drop-inner" for="input-transferPdf">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4L7 9M12 4l5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+            <span class="main-txt">Drop PDFs here or <span class="accent-word">browse</span></span>
+            <span class="sub-txt">Multiple .pdf files accepted</span>
+          </label>
+          <input type="file" id="input-transferPdf" name="transferPdf" accept=".pdf" multiple />
+          <div class="file-list" id="filelist-transferPdf"></div>
+          <div class="zone-error-msg" id="error-transferPdf"></div>
+        </div>
+
+        <!-- POLICY PDFS (optional, multiple) -->
+        <div class="zone" id="zone-policyPdfs" data-input="policyPdfs">
+          <div class="zone-top">
+            <span class="zone-label">Policy PDFs <span class="opt">Optional</span></span>
+            <span class="zone-count" id="count-policyPdfs">0 files</span>
+          </div>
+          <label class="drop-inner" for="input-policyPdfs">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4L7 9M12 4l5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+            <span class="main-txt">Drop PDFs here or <span class="accent-word">browse</span></span>
+            <span class="sub-txt">Multiple .pdf files accepted</span>
+          </label>
+          <input type="file" id="input-policyPdfs" name="policyPdfs" accept=".pdf" multiple />
+          <div class="file-list" id="filelist-policyPdfs"></div>
+          <div class="zone-error-msg" id="error-policyPdfs"></div>
+        </div>
+
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">
+        <span class="spinner"></span>
+        <span class="btn-txt">Start Optimization</span>
+      </button>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="progress-label" id="progressLabel">Uploading… 0%</div>
+    </form>
+
+    <div class="notice" id="notice"></div>
+
+    <div class="footnote">
+      Sends to <code id="webhookDisplay"></code>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ============================================================
+  // CONFIG
+  // ============================================================
+  const WEBHOOK_URL = "https://monalgaur.app.n8n.cloud/webhook-test/employee";
+  document.getElementById("webhookDisplay").textContent = WEBHOOK_URL;
+
+  // Zone definitions: id -> { multiple, required }
+  // transferPdf is now multiple:true — a single "employee transfer" data set
+  // can be split across several source PDFs (e.g. per-plant memos), and all
+  // of them are required to be merged together on the backend.
+  const ZONES = {
+    assetPdfs:   { multiple: true,  required: false },
+    transferPdf: { multiple: true,  required: true  },
+    policyPdfs:  { multiple: true,  required: false }
+  };
+
+  // In-memory store of selected files per zone (array of File objects)
+  const store = {
+    assetPdfs: [],
+    transferPdf: [],
+    policyPdfs: []
+  };
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  function formatBytes(bytes){
+    if (bytes === 0) return "0 B";
+    const units = ["B","KB","MB","GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + units[i];
+  }
+
+  function isPdf(file){
+    const nameOk = file.name.toLowerCase().endsWith(".pdf");
+    const typeOk = file.type === "application/pdf" || file.type === "";
+    return nameOk && typeOk;
+  }
+
+  function fileKey(file){
+    return file.name + "_" + file.size + "_" + file.lastModified;
+  }
+
+  function setZoneError(zoneName, msg){
+    const el = document.getElementById("error-" + zoneName);
+    const zoneEl = document.getElementById("zone-" + zoneName);
+    if (msg){
+      el.textContent = msg;
+      zoneEl.classList.add("has-error");
+      setTimeout(() => zoneEl.classList.remove("has-error"), 400);
+    } else {
+      el.textContent = "";
+    }
+  }
+
+  // ============================================================
+  // RENDER FILE LIST FOR A ZONE
+  // ============================================================
+  function renderZone(zoneName){
+    const listEl = document.getElementById("filelist-" + zoneName);
+    const countEl = document.getElementById("count-" + zoneName);
+    const files = store[zoneName];
+
+    countEl.textContent = files.length + (files.length === 1 ? " file" : " files");
+    listEl.innerHTML = "";
+
+    files.forEach((file, idx) => {
+      const item = document.createElement("div");
+      item.className = "file-item";
+
+      const meta = document.createElement("div");
+      meta.className = "file-meta";
+
+      const icon = document.createElement("div");
+      icon.className = "file-icon";
+      icon.textContent = "PDF";
+
+      const name = document.createElement("span");
+      name.className = "file-name";
+      name.textContent = file.name;
+      name.title = file.name;
+
+      meta.appendChild(icon);
+      meta.appendChild(name);
+
+      const size = document.createElement("span");
+      size.className = "file-size";
+      size.textContent = formatBytes(file.size);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "remove-btn";
+      removeBtn.innerHTML = "&times;";
+      removeBtn.setAttribute("aria-label", "Remove " + file.name);
+      removeBtn.addEventListener("click", () => {
+        store[zoneName].splice(idx, 1);
+        renderZone(zoneName);
+      });
+
+      item.appendChild(meta);
+      item.appendChild(size);
+      item.appendChild(removeBtn);
+      listEl.appendChild(item);
+    });
+  }
+
+  // ============================================================
+  // ADD FILES TO A ZONE (validates type, single vs multiple, dupes)
+  // ============================================================
+  function addFilesToZone(zoneName, fileListLike){
+    const config = ZONES[zoneName];
+    const incoming = Array.from(fileListLike);
+    if (incoming.length === 0) return;
+
+    const rejectedNonPdf = [];
+    const rejectedDupe = [];
+    let accepted = [];
+
+    const existingKeys = new Set(store[zoneName].map(fileKey));
+
+    incoming.forEach(file => {
+      if (!isPdf(file)){
+        rejectedNonPdf.push(file.name);
+        return;
+      }
+      const key = fileKey(file);
+      if (existingKeys.has(key)){
+        rejectedDupe.push(file.name);
+        return;
+      }
+      existingKeys.add(key);
+      accepted.push(file);
+    });
+
+    if (!config.multiple){
+      // single-file zone: keep only the last valid accepted file
+      if (accepted.length > 0){
+        store[zoneName] = [accepted[accepted.length - 1]];
+      }
+    } else {
+      store[zoneName] = store[zoneName].concat(accepted);
+    }
+
+    // error messaging
+    let msgParts = [];
+    if (rejectedNonPdf.length){
+      msgParts.push(rejectedNonPdf.length + " file(s) skipped — only .pdf is accepted.");
+    }
+    if (rejectedDupe.length){
+      msgParts.push(rejectedDupe.length + " duplicate file(s) skipped.");
+    }
+    setZoneError(zoneName, msgParts.join(" "));
+
+    renderZone(zoneName);
+  }
+
+  // ============================================================
+  // WIRE UP EACH ZONE: click-to-browse, native input change, drag & drop
+  // ============================================================
+  Object.keys(ZONES).forEach(zoneName => {
+    const zoneEl = document.getElementById("zone-" + zoneName);
+    const inputEl = document.getElementById("input-" + zoneName);
+
+    inputEl.addEventListener("change", (e) => {
+      addFilesToZone(zoneName, e.target.files);
+      inputEl.value = ""; // allow re-selecting same file later
+    });
+
+    ["dragenter", "dragover"].forEach(evt => {
+      zoneEl.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        zoneEl.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach(evt => {
+      zoneEl.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        zoneEl.classList.remove("dragover");
+      });
+    });
+
+    zoneEl.addEventListener("drop", (e) => {
+      const dt = e.dataTransfer;
+      if (dt && dt.files) addFilesToZone(zoneName, dt.files);
+    });
+  });
+
+  // ============================================================
+  // NOTICE RENDERING
+  // ============================================================
+  const noticeEl = document.getElementById("notice");
+
+  function showNotice(type, title, bodyText, jsonData){
+    noticeEl.className = "notice show " + type;
+    noticeEl.innerHTML = "";
+
+    const titleEl = document.createElement("div");
+    titleEl.className = "notice-title";
+    titleEl.textContent = (type === "success" ? "✓ " : "✕ ") + title;
+    noticeEl.appendChild(titleEl);
+
+    if (bodyText){
+      const bodyEl = document.createElement("div");
+      bodyEl.textContent = bodyText;
+      noticeEl.appendChild(bodyEl);
+    }
+
+    if (jsonData !== undefined){
+      const pre = document.createElement("pre");
+      let printable;
+      try {
+        printable = typeof jsonData === "string" ? jsonData : JSON.stringify(jsonData, null, 2);
+      } catch (err){
+        printable = String(jsonData);
+      }
+      pre.textContent = printable;
+      noticeEl.appendChild(pre);
+    }
+
+    noticeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function showDownloadNotice(blob, filename){
+    const downloadUrl = URL.createObjectURL(blob);
+
+    noticeEl.className = "notice show success";
+    noticeEl.innerHTML = "";
+
+    const titleEl = document.createElement("div");
+    titleEl.className = "notice-title";
+    titleEl.textContent = "✓ Optimization workflow completed";
+    noticeEl.appendChild(titleEl);
+
+    const bodyEl = document.createElement("div");
+    bodyEl.textContent = "Your transfer report is ready.";
+    noticeEl.appendChild(bodyEl);
+
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = filename;
+    link.className = "download-link";
+    link.textContent = "Download transfer report (.xlsx)";
+    noticeEl.appendChild(link);
+
+    noticeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function clearNotice(){
+    noticeEl.className = "notice";
+    noticeEl.innerHTML = "";
+  }
+
+  // ============================================================
+  // SUBMIT HANDLING
+  // ============================================================
+  const form = document.getElementById("uploadForm");
+  const submitBtn = document.getElementById("submitBtn");
+  const progressWrap = document.getElementById("progressWrap");
+  const progressBar = document.getElementById("progressBar");
+  const progressLabel = document.getElementById("progressLabel");
+
+  function setLoading(isLoading){
+    submitBtn.disabled = isLoading;
+    submitBtn.classList.toggle("loading", isLoading);
+  }
+
+  function showProgress(pct){
+    progressWrap.classList.add("active");
+    progressLabel.classList.add("active");
+    progressBar.style.width = pct + "%";
+    progressLabel.textContent = "Uploading… " + pct + "%";
+  }
+
+  function hideProgress(){
+    progressWrap.classList.remove("active");
+    progressLabel.classList.remove("active");
+    progressBar.style.width = "0%";
+  }
+
+  // XHR-based upload so we get real progress events (fetch does not expose upload progress).
+  // responseType is "blob" because the webhook now returns a binary .xlsx file, not JSON.
+  function uploadWithProgress(url, formData){
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url, true);
+      xhr.responseType = "blob";
+
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable){
+          const pct = Math.round((e.loaded / e.total) * 100);
+          showProgress(pct);
+        }
+      });
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300){
+          resolve(xhr.response); // Blob
+        } else {
+          // try to read the error body as text for a useful message
+          const errBlob = xhr.response;
+          const err = new Error("Server responded with status " + xhr.status);
+          if (errBlob instanceof Blob){
+            errBlob.text().then(text => {
+              err.responseBody = text;
+              reject(err);
+            }).catch(() => reject(err));
+          } else {
+            reject(err);
+          }
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Network error — could not reach the webhook."));
+      };
+
+      xhr.send(formData);
+    });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearNotice();
+
+    // ---- validation ----
+    let valid = true;
+
+    if (store.transferPdf.length === 0){
+      setZoneError("transferPdf", "At least one Employee Transfer PDF is required.");
+      valid = false;
+    } else {
+      setZoneError("transferPdf", "");
+    }
+
+    if (!valid){
+      showNotice("error", "Missing required files", "Please add the required PDFs highlighted above before starting the optimization.");
+      return;
+    }
+
+    // ---- build FormData ----
+    // All three zones now append every selected file under the same field
+    // name (multiple entries per key) — n8n's webhook will expose these as
+    // separate binary properties for the splitting Code node to fan out.
+    const formData = new FormData();
+    store.assetPdfs.forEach(file => formData.append("assetPdfs", file));
+    store.transferPdf.forEach(file => formData.append("transferPdf", file));
+    store.policyPdfs.forEach(file => formData.append("policyPdfs", file));
+
+    // ---- send ----
+    setLoading(true);
+    showProgress(0);
+
+    try {
+      const blob = await uploadWithProgress(WEBHOOK_URL, formData);
+      hideProgress();
+      setLoading(false);
+      showDownloadNotice(blob, "transfer_report.xlsx");
+    } catch (err) {
+      hideProgress();
+      setLoading(false);
+      const bodyMsg = err.message || "The request failed.";
+      showNotice("error", "Upload failed", bodyMsg, err.responseBody !== undefined ? err.responseBody : undefined);
+    }
+  });
+
+})();
+</script>
+
+</body>
+</html>
