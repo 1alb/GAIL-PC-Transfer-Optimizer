@@ -1,0 +1,679 @@
+{
+  "name": "My workflow 4",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pc-logistics",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryPropertyName": ""
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2576,
+        -256
+      ],
+      "id": "df1c17f1-bf0a-49bc-80f9-8d7f4b732329",
+      "name": "Webhook1",
+      "webhookId": "b99196b6-617e-41af-90ba-8d756b7f4d8a"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://revisit-wildly-egging.ngrok-free.dev/extract-transfers",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2048,
+        -432
+      ],
+      "id": "8c7bdef5-f955-4ee4-82dc-56b2f12b3782",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Parse OCR table rows into pipe-delimited records. Each input line is one row: space-separated x0:word tokens sorted left-to-right. Columns left-to-right: SN, EMPID, NAME, GRADE, CURRENT, NEW, FUNCTION, REMARKS. Multi-word values (names, plant/city names like 'DABHOL KLL') stay in one field. Grade is always 2 chars: E or S + digit. Output exactly one line per input row: SN|EMPID|NAME|GRADE|CURRENT|NEW|FUNCTION|REMARKS. Leave a field blank if absent. No headers, no explanations, no markdown.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": `${$json.rows}`\n    }\n  ],\n  \"temperature\": 0,\n  \"response_format\": { \"type\": \"text\" }\n}\n}}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 4,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1488,
+        -304
+      ],
+      "id": "bad168b2-0655-4844-b39c-fa55f1073400",
+      "name": "llm3",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1072,
+        -64
+      ],
+      "id": "3181f738-0674-42b6-8ce8-28c31abb8b40",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://revisit-wildly-egging.ngrok-free.dev/optimize",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        -64
+      ],
+      "id": "69d843d5-616b-45ab-990e-eb71f1a7d3f8",
+      "name": "FASTapi Server1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enable \"Execute Once\" in node Settings so this runs on the full batch,\n// not once per PDF item.\nconst items = $input.all();\n\nconst plantSet = new Set();\nfor (const item of items) {\n  const transfers = item.json.transfers || [];\n  for (const transfer of transfers) {\n    if (transfer.current_location) {\n      plantSet.add(\n        transfer.current_location\n          .replace(/\\s+Plant$/i, \"\")\n          .trim()\n      );\n    }\n    if (transfer.new_location) {\n      plantSet.add(\n        transfer.new_location\n          .replace(/\\s+Plant$/i, \"\")\n          .trim()\n      );\n    }\n  }\n}\n\nreturn [...plantSet].map(name => {\n  const firstPart = name.split(/[\\s-]+/)[0];\n  return {\n    json: {\n      plant_name: name,\n      search_query: `${firstPart}, India`\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -336
+      ],
+      "id": "16ca20b8-24a4-4070-b137-329f888fac30",
+      "name": "Code in JavaScript11"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const MANUAL_COORDINATES = {\n  \"ADIYAKAMANGALAM\": { latitude: 10.761814, longitude: 79.678294 },\n};\n\nconst plantName = $('Code in JavaScript11').item.json.plant_name;\nconst location = $json.results[0];\n\n// Manual override takes priority — skip geocoding result entirely if we have one\nif (MANUAL_COORDINATES[plantName]) {\n  return {\n    json: {\n      plant_name: plantName,\n      latitude: MANUAL_COORDINATES[plantName].latitude,\n      longitude: MANUAL_COORDINATES[plantName].longitude,\n      geocode_failed: false,\n      manually_corrected: true,\n      originalData: $('Code in JavaScript11').item.json.originalData\n    }\n  };\n}\n\nif (location.components._type === 'country') {\n  return {\n    json: {\n      plant_name: plantName,\n      latitude: null,\n      longitude: null,\n      geocode_failed: true,\n      originalData: $('Code in JavaScript11').item.json.originalData\n    }\n  };\n}\n\nreturn {\n  json: {\n    plant_name: plantName,\n    latitude: Number(location.geometry.lat),\n    longitude: Number(location.geometry.lng),\n    geocode_failed: false,\n    originalData: $('Code in JavaScript11').item.json.originalData\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        -80
+      ],
+      "id": "874b54a2-138a-4587-b4a4-dca74c777c3a",
+      "name": "Code in JavaScript13"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst coordMap = {};\nfor (const item of items) {\n  coordMap[item.json.plant_name] = {\n    latitude: item.json.latitude,\n    longitude: item.json.longitude\n  };\n}\n\nconst allTransfers = $('Parse LLM output').first().json?.transfers ?? [];\n\nconst transfers = allTransfers.map(t => {\n  const fromKey = t.current_location;\n  const toKey = t.new_location;\n  return {\n    employee_id: t.emp_no,\n    employee_name: t.name,\n    from_location: fromKey,\n    to_location: toKey,\n    from_coords: coordMap[fromKey] ?? null,\n    to_coords: coordMap[toKey] ?? null,\n  };\n});\n\nreturn [{ json: { transfers } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -48
+      ],
+      "id": "5d3fcd7e-d3f8-4390-8a73-53861ece2715",
+      "name": "Code in JavaScript14"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        768,
+        -64
+      ],
+      "id": "fc97bbd8-3f19-4102-a359-4e75e5e8c73c",
+      "name": "Convert to File1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json // response is an array with one object\nconst rows = [];\n\n// Two-way swaps\nfor (const swap of result.two_way_swaps ?? []) {\n  for (const t of swap.transfers) {\n    rows.push({\n      type: \"2-way swap\",\n      cycle_id: swap.cycle_id,\n      employee_id: t.employee_id,\n      employee_name: t.employee_name,\n      from_location: t.from_location,\n      to_location: t.to_location,\n      reason: swap.reason\n    });\n  }\n}\n\n// Three-way swaps\nfor (const swap of result.three_way_swaps ?? []) {\n  for (const t of swap.transfers) {\n    rows.push({\n      type: \"3-way swap\",\n      cycle_id: swap.cycle_id,\n      employee_id: t.employee_id,\n      employee_name: t.employee_name,\n      from_location: t.from_location,\n      to_location: t.to_location,\n      reason: swap.reason\n    });\n  }\n}\n\n// Surplus transfers (bulk city-to-city shipments)\nfor (const s of result.surplus_transfers ?? []) {\n  rows.push({\n    type: \"Surplus transfer\",\n    cycle_id: \"\",\n    employee_id: \"\",\n    employee_name: \"\",\n    from_location: s.from_location,\n    to_location: s.to_location,\n    quantity: s.quantity,\n    reason: \"City needs PC — surplus routing\"\n  });\n}\n\n// Unresolved transfers\nfor (const t of result.unresolved_transfers ?? []) {\n  rows.push({\n    type: \"Unresolved\",\n    cycle_id: \"\",\n    employee_id: t.employee_id,\n    employee_name: t.employee_name,\n    from_location: t.from_location,\n    to_location: t.to_location,\n    reason: \"No match found\"\n  });\n}\n\nreturn rows.map(r => ({ json: r }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -64
+      ],
+      "id": "8ccebeca-55ac-4597-82dc-9353094e4bf7",
+      "name": "Code in JavaScript15"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst items = $input.all();\n\nfor (const item of items) {\n  const name = item.json.plant_name;\n  staticData.geocodeCache[name] = {\n    latitude: item.json.latitude,\n    longitude: item.json.longitude\n  };\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        1568
+      ],
+      "id": "822b5c23-a202-4aaf-9c48-29622f4d052e",
+      "name": "Code in JavaScript17"
+    },
+    {
+      "parameters": {
+        "url": "https://api.opencagedata.com/geocode/v1/json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.plant_name }}, India"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "countrycodes",
+              "value": "in"
+            },
+            {
+              "name": "key",
+              "value": "0ccff4130e68a7a5e8907780825b561c"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "PC-Logistics-Optimizer/1.0 (sanyasrivastava1@gmail.com)"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        1472
+      ],
+      "id": "2e7a0caa-2fad-4d09-9260-6a1a629ec4f4",
+      "name": "coordinates1",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        1440
+      ],
+      "id": "2860b2ee-fdb5-412f-bf6c-3a9a612b21bb",
+      "name": "Wait",
+      "webhookId": "65acc6ba-f83c-4a6d-8aad-720272e17e47"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -80,
+        1856
+      ],
+      "id": "acad7238-aba6-48c1-a5c8-ad3f845fe172",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "https://nominatim.openstreetmap.org/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.plant_name }}, India"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "countrycodes",
+              "value": "in"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "PC-Logistics-Optimizer/1.0 (sanyasrivastava1@gmail.com)"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        560,
+        1936
+      ],
+      "id": "879ab251-ee62-47d1-a4b6-5883c619043e",
+      "name": "coordinates",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.opencagedata.com/geocode/v1/json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.search_query }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "countrycodes",
+              "value": "in"
+            },
+            {
+              "name": "key",
+              "value": "d2011716522b4671b957fd538a3fdec0"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "PC-Logistics-Optimizer/1.0 (sanyasrivastava1@gmail.com)"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -784,
+        -80
+      ],
+      "id": "3f557c29-3cb8-4fd8-9620-d5096c5116f5",
+      "name": "coordinates2",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryKeys = Object.keys($input.first().binary || {});\nreturn binaryKeys.map(key => ({\n  json: { sourceFile: key },\n  binary: { data: $input.first().binary[key] }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2272,
+        -288
+      ],
+      "id": "042f0613-0684-4669-a62a-9884b45d8d38",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1616,
+        -480
+      ],
+      "id": "b96ac06d-d68a-41cf-a56d-ea2513435f25",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        1248
+      ],
+      "id": "b071362b-7fd7-4976-bd15-494ffa0aa791",
+      "placeholder": true
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1280,
+        -304
+      ],
+      "id": "c6ed251d-2648-46f8-bef0-60da1e4dfc65",
+      "name": "Wait1",
+      "webhookId": "83695449-d6f7-4ed0-96a3-4fccd5b048be"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mode: \"Run Once for All Items\"\nconst items = $input.all(); // one item per PDF document\nconst pageItems = [];\n\nfor (const item of items) {\n  const doc = item.json; // { source_filename, page_width, num_pages, pages, total_candidate_rows }\n  for (const page of doc.pages) {\n    pageItems.push({\n      json: {\n        source_filename: doc.source_filename,\n        page_number: page.page_number,\n        rows: page.rows\n      }\n    });\n  }\n}\n\nreturn pageItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1856,
+        -496
+      ],
+      "id": "1b9e1a44-7e16-4c8a-8867-e269962e43b1",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet allRecords = [];\nfor (const item of items) {\n  const text = item.json.choices[0].message.content.trim(); // adjust path to match your LLM node's output shape\n  const lines = text.split(\"\\n\").filter(l => l.trim());\n  for (const line of lines) {\n    const [sn, emp_no, name, grade, current, newloc, func, remarks] = line.split(\"|\");\n    allRecords.push({ sn, emp_no, name, grade, current_location: current, new_location: newloc, new_function: func, remarks });\n  }\n}\nreturn [{ json: { transfers: allRecords } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        -528
+      ],
+      "id": "e24a08a4-cd8c-464a-9fe4-195b6b97ce94",
+      "name": "Parse LLM output"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "llm3": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FASTapi Server1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript11": {
+      "main": [
+        [
+          {
+            "node": "coordinates2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript13": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript14": {
+      "main": [
+        [
+          {
+            "node": "FASTapi Server1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript15": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "coordinates1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        []
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "coordinates2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "llm3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        []
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LLM output": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "341072cb-4d42-43aa-9e19-605289cab0ec",
+  "meta": {
+    "instanceId": "de429734d73b6c1471f1a636980b719e2ff2f35a74326abfd0fe38a8e7c76ee6"
+  },
+  "nodeGroups": [],
+  "id": "63AsnWMW9RGShdtf",
+  "tags": []
+}
